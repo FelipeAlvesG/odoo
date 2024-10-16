@@ -13,7 +13,7 @@ except ImportError:
     slugify_lib = None
 
 import odoo
-from odoo import api, models
+from odoo import api, models, http
 from odoo.addons.base.ir.ir_http import RequestUID, ModelConverter
 from odoo.http import request
 from odoo.tools import config, ustr, pycompat
@@ -43,7 +43,7 @@ def _guess_mimetype(ext=False, default='text/html'):
     return ext is not False and exts.get(ext, default) or exts
 
 
-def slugify_one(s, max_length=None):
+def slugify_one(s, max_length=0):
     """ Transform a string to a slug that can be used in a url path.
         This method will first try to do the job with python-slugify if present.
         Otherwise it will process string by stripping leading and ending spaces,
@@ -61,13 +61,12 @@ def slugify_one(s, max_length=None):
         except TypeError:
             pass
     uni = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
-    slug_str = re.sub('[\W_]', ' ', uni).strip().lower()
-    slug_str = re.sub('[-\s]+', '-', slug_str)
+    slug_str = re.sub(r'[\W_]', ' ', uni).strip().lower()
+    slug_str = re.sub(r'[-\s]+', '-', slug_str)
+    return slug_str[:max_length] if max_length > 0 else slug_str
 
-    return slug_str[:max_length]
 
-
-def slugify(s, max_length=None, path=False):
+def slugify(s, max_length=0, path=False):
     if not path:
         return slugify_one(s, max_length=max_length)
     else:
@@ -164,15 +163,19 @@ def is_multilang_url(local_url, langs=None):
         local_url = '/'.join(spath)
     try:
         # Try to match an endpoint in werkzeug's routing table
-        url = local_url.split('?')
+        url = local_url.partition('#')[0].split('?')
         path = url[0]
         query_string = url[1] if len(url) > 1 else None
-        router = request.httprequest.app.get_db_router(request.db).bind('')
+        router = http.root.get_db_router(request.db).bind('')
         # Force to check method to POST. Odoo uses methods : ['POST'] and ['GET', 'POST']
         func = router.match(path, method='POST', query_args=query_string)[0]
         return (func.routing.get('website', False) and
                 func.routing.get('multilang', func.routing['type'] == 'http'))
     except werkzeug.exceptions.NotFound:
+        # Consider /static/ files as non-multilang
+        static_index = path.find('/static/', 1)
+        if static_index != -1 and static_index == path.find('/', 1):
+            return False
         return True
     except Exception as e:
         return False

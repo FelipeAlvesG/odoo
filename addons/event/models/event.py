@@ -380,6 +380,14 @@ class EventRegistration(models.Model):
         return registration
 
     @api.model
+    def check_access_rights(self, operation, raise_exception=True):
+        if not self.env.user._is_admin() and not self.user_has_groups('event.group_event_user'):
+            if raise_exception:
+                raise AccessError(_('Only event users or managers are allowed to create or update registrations.'))
+            return False
+        return super(EventRegistration, self).check_access_rights(operation, raise_exception=raise_exception)
+
+    @api.model
     def _prepare_attendee_values(self, registration):
         """ Method preparing the values to create new attendees based on a
         sales order line. It takes some registration data (dict-based) that are
@@ -394,7 +402,11 @@ class EventRegistration(models.Model):
             'partner_id': partner_id.id,
             'event_id': event_id and event_id.id or False,
         }
-        data.update({key: value for key, value in registration.items() if key in self._fields})
+        data.update({
+            key: value for key, value in registration.items()
+            if key in self._fields and key not in data and not self._fields[key].default
+        })
+
         return data
 
     @api.one
@@ -438,9 +450,14 @@ class EventRegistration(models.Model):
     @api.multi
     def message_get_suggested_recipients(self):
         recipients = super(EventRegistration, self).message_get_suggested_recipients()
+        public_users = self.env['res.users'].sudo()
+        public_groups = self.env.ref("base.group_public", raise_if_not_found=False)
+        if public_groups:
+            public_users = public_groups.sudo().with_context(active_test=False).mapped("users")
         try:
             for attendee in self:
-                if attendee.partner_id:
+                is_public = attendee.sudo().with_context(active_test=False).partner_id.user_ids in public_users if public_users else False
+                if attendee.partner_id and not is_public:
                     attendee._message_add_suggested_recipient(recipients, partner=attendee.partner_id, reason=_('Customer'))
                 elif attendee.email:
                     attendee._message_add_suggested_recipient(recipients, email=attendee.email, reason=_('Customer Email'))
@@ -461,6 +478,17 @@ class EventRegistration(models.Model):
                     ('state', 'not in', ['cancel']),
                 ]).write({'partner_id': new_partner.id})
         return super(EventRegistration, self)._message_post_after_hook(message)
+
+    @api.multi
+    def message_get_default_recipients(self):
+        # Prioritize registration email over partner_id, which may be shared when a single
+        # partner booked multiple seats
+        return {
+            r.id: {'partner_ids': [],
+                   'email_to': r.email,
+                   'email_cc': False}
+            for r in self
+        }
 
     @api.multi
     def action_send_badge_email(self):

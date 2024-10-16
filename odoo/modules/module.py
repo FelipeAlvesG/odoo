@@ -128,17 +128,17 @@ def initialize_sys_path():
     global ad_paths
     global hooked
 
-    dd = tools.config.addons_data_dir
+    dd = os.path.normcase(tools.config.addons_data_dir)
     if os.access(dd, os.R_OK) and dd not in ad_paths:
         ad_paths.append(dd)
 
     for ad in tools.config['addons_path'].split(','):
-        ad = os.path.abspath(tools.ustr(ad.strip()))
+        ad = os.path.normcase(os.path.abspath(tools.ustr(ad.strip())))
         if ad not in ad_paths:
             ad_paths.append(ad)
 
     # add base module path
-    base_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'addons'))
+    base_path = os.path.normcase(os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'addons')))
     if base_path not in ad_paths and os.path.isdir(base_path):
         ad_paths.append(base_path)
 
@@ -435,7 +435,7 @@ def get_test_modules(module):
     except ImportError as e:  # will also catch subclass ModuleNotFoundError of P3.6
         # Hide ImportErrors on `tests` sub-module, but display other exceptions
         if pycompat.PY2:
-            if e.message.startswith('No module named') and e.message.endswith("tests"):
+            if e.message.startswith('No module named') and e.message.endswith("tests"): # pylint: disable=exception-message-attribute
                 return []
         else:
             if e.name == modpath + '.tests' and e.msg.startswith('No module named'):

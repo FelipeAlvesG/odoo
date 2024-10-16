@@ -8,6 +8,7 @@ var Widget = require('web.Widget');
 var weContext = require('web_editor.context');
 var rte = require('web_editor.rte');
 var weWidgets = require('web_editor.widget');
+var Dialog = require('web.Dialog');
 
 var _t = core._t;
 
@@ -26,6 +27,7 @@ var RTETranslatorWidget = rte.Class.extend({
      * @override
      */
     _saveElement: function ($el, context, withLang) {
+        var self = this;
         if ($el.data('oe-translation-id')) {
             return this._rpc({
                 model: 'ir.translation',
@@ -35,7 +37,9 @@ var RTETranslatorWidget = rte.Class.extend({
                     this._getEscapedElement($el).html(),
                     context || weContext.get()
                 ],
-            });
+            }).fail(function (error) {
+                   Dialog.alert(null, error.data.message);
+               });
         }
         return this._super($el, context, withLang === undefined ? true : withLang);
     },
@@ -348,7 +352,7 @@ var TranslatorMenuBar = Widget.extend({
      */
     _onRTEChange: function (ev) {
         var $node = $(ev.data.target);
-        $node.find('p').each(function () { // remove <p/> element which might have been inserted because of copy-paste
+        $node.find('p,div').each(function () { // remove P,DIV elements which might have been inserted because of copy-paste
             var $p = $(this);
             $p.after($p.html()).remove();
         });

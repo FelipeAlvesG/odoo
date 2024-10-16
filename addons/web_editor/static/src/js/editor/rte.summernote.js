@@ -472,7 +472,7 @@ function prettify_html(html) {
             while (i--) space += '  ';
             return space;
         },
-        reg = /^<\/?(a|span|font|strong|u|i|strong|b)(\s|>)/i,
+        reg = /^<\/?(a|span|font|u|em|i|strong|b)(\s|>)/i,
         inline_level = Infinity,
         tokens = _.compact(_.flatten(_.map(html.split(/</), function (value) {
             value = value.replace(/\s+/g, ' ').split(/>/);
@@ -881,7 +881,10 @@ eventHandler.attach = function (oLayoutInfo, options) {
 
             show_tooltip = true;
             setTimeout(function () {
-                if (!show_tooltip) return;
+                // Do not show tooltip on double-click and if there is already one
+                if (!show_tooltip || $target.attr('title') !== undefined) {
+                    return;
+                }
                 $target.tooltip({title: _t('Double-click to edit'), trigger: 'manuel', container: 'body'}).tooltip('show');
                 setTimeout(function () {
                     $target.tooltip('destroy');

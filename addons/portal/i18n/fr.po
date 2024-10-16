@@ -4,36 +4,39 @@
 # 
 # Translators:
 # Bertrand LATOUR <divoir@gmail.com>, 2017
-# Eloïse Stilmant <est@odoo.com>, 2017
-# Martin Trigaux, 2017
-# Jean-Marc Dupont <jmd@6it.fr>, 2017
-# Daniel & Delphine <dd2013@leschoupinous.net>, 2017
-# Phyrexian <phyrexian09@gmail.com>, 2017
 # Xavier Symons <xsy@openerp.com>, 2017
 # Jérémy Donas <LeDistordu@users.noreply.github.com>, 2017
+# Jean-Marc Dupont <jmd@6it.fr>, 2017
 # Melanie Bernard <mbe@odoo.com>, 2017
-# Xavier Belmere <Info@cartmeleon.com>, 2017
-# Richard Mathot <rim@odoo.com>, 2017
-# Leo Schmitt <inactive+lschmitt@transifex.com>, 2017
-# Olivier Lenoir <olivier.lenoir@free.fr>, 2017
+# f477e7ae9c75a2428d6113663a8354fe_bcd021c <0ff4ce060a36f446722508a48e99c22a_347081>, 2017
+# Daniel & Delphine <dd2013@leschoupinous.net>, 2017
 # Lucas Deliege <lud@odoo.com>, 2017
 # Maxime Chambreuil <mchambreuil@ursainfosystems.com>, 2017
+# Eloïse Stilmant <est@odoo.com>, 2017
 # Micky Jault <micky037@hotmail.fr>, 2017
+# Xavier Belmere <Info@cartmeleon.com>, 2017
 # Adriana Ierfino <adriana.ierfino@savoirfairelinux.com>, 2017
 # Frédéric LIETART <stuff@tifred.fr>, 2017
 # Kévin R., 2017
+# Olivier Lenoir <olivier.lenoir@free.fr>, 2017
 # Fabri Yohann <psn@fabri.pw>, 2017
+# Phyrexian <phyrexian09@gmail.com>, 2017
+# Richard Mathot <rim@odoo.com>, 2017
 # Florian Hatat, 2017
-# fr trans <e2ffr05@hotmail.com>, 2018
 # e2f <projects@e2f.com>, 2018
-# fr rev <e2ffr02@hotmail.com>, 2018
+# fr trans <e2ffr05@hotmail.com>, 2018
+# bb76cd9ac0cb7e20167a14728edb858b, 2018
+# Martin Trigaux, 2018
+# Clo <clo@odoo.com>, 2018
+# Jonathan Castillo <jcs@odoo.com>, 2021
+# 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 10.saas~18\n"
+"Project-Id-Version: Odoo Server 11.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2017-10-02 11:27+0000\n"
-"PO-Revision-Date: 2017-10-02 11:27+0000\n"
-"Last-Translator: fr rev <e2ffr02@hotmail.com>, 2018\n"
+"POT-Creation-Date: 2018-07-27 11:56+0000\n"
+"PO-Revision-Date: 2017-09-20 10:21+0000\n"
+"Last-Translator: Jonathan Castillo <jcs@odoo.com>, 2021\n"
 "Language-Team: French (https://www.transifex.com/odoo/teams/41243/fr/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -98,9 +101,29 @@ msgid "<b>Sign in</b>"
 msgstr "<b>Se connecter</b>"
 
 #. module: portal
+#: model:ir.ui.view,arch_db:portal.frontend_layout
+msgid ""
+"<span class=\"sr-only\">Toggle navigation</span>\n"
+"                                    <span class=\"icon-bar\"/>\n"
+"                                    <span class=\"icon-bar\"/>\n"
+"                                    <span class=\"icon-bar\"/>"
+msgstr ""
+"<span class=\"sr-only\">Basculer la navigation</span>\n"
+"                                    <span class=\"icon-bar\"/>\n"
+"                                    <span class=\"icon-bar\"/>\n"
+"                                    <span class=\"icon-bar\"/>"
+
+#. module: portal
 #: model:ir.ui.view,arch_db:portal.portal_searchbar
 msgid "<span id=\"search_label\">Search</span> <span class=\"caret\"/>"
 msgstr "<span id=\"search_label\">Chercher</span> <span class=\"caret\"/>"
+
+#. module: portal
+#. openerp-web
+#: code:addons/portal/static/src/xml/portal_signature.xml:24
+#, python-format
+msgid "Accept and Sign"
+msgstr ""
 
 #. module: portal
 #: model:ir.ui.view,arch_db:portal.wizard_view
@@ -226,6 +249,11 @@ msgid "Group %s is not a portal"
 msgstr "Le groupe %s n'est pas un portail"
 
 #. module: portal
+#: model:ir.model,name:portal.model_ir_http
+msgid "HTTP routing"
+msgstr "Routage HTTP"
+
+#. module: portal
 #: model:ir.model.fields,field_description:portal.field_portal_mixin_id
 #: model:ir.model.fields,field_description:portal.field_portal_wizard_id
 #: model:ir.model.fields,field_description:portal.field_portal_wizard_user_id
@@ -238,7 +266,7 @@ msgid "In Portal"
 msgstr "Dans le portail"
 
 #. module: portal
-#: code:addons/portal/controllers/portal.py:180
+#: code:addons/portal/controllers/portal.py:200
 #, python-format
 msgid "Invalid Email! Please enter a valid email address."
 msgstr "Adresse email incorrecte! Merci de saisir une adresse email valable."
@@ -346,7 +374,7 @@ msgstr "Préc."
 
 #. module: portal
 #. openerp-web
-#: code:addons/portal/static/src/js/portal_chatter.js:101
+#: code:addons/portal/static/src/js/portal_chatter.js:102
 #, python-format
 msgid "Published on %s"
 msgstr "Publié le %s"
@@ -390,7 +418,7 @@ msgstr ""
 " :"
 
 #. module: portal
-#: code:addons/portal/controllers/portal.py:197
+#: code:addons/portal/controllers/portal.py:219
 #, python-format
 msgid "Some required fields are empty."
 msgstr "Certains champs obligatoires sont vides."
@@ -410,7 +438,7 @@ msgstr "Rue"
 #: code:addons/portal/static/src/xml/portal_signature.xml:25
 #, python-format
 msgid "Thank You !"
-msgstr "erci!"
+msgstr "Merci !"
 
 #. module: portal
 #: model:ir.model.fields,help:portal.field_portal_wizard_portal_id
@@ -458,7 +486,7 @@ msgstr "Utilisateurs"
 #. module: portal
 #: model:ir.ui.view,arch_db:portal.portal_my_details
 msgid "VAT Number"
-msgstr "Numéro de TVA intracommunautaire"
+msgstr "Numéro de TVA"
 
 #. module: portal
 #: model:ir.model.fields,field_description:portal.field_account_analytic_account_website_message_ids
@@ -506,7 +534,6 @@ msgstr "Numéro de TVA intracommunautaire"
 #: model:ir.model.fields,field_description:portal.field_product_product_website_message_ids
 #: model:ir.model.fields,field_description:portal.field_product_template_website_message_ids
 #: model:ir.model.fields,field_description:portal.field_project_project_website_message_ids
-#: model:ir.model.fields,field_description:portal.field_project_task_website_message_ids
 #: model:ir.model.fields,field_description:portal.field_purchase_order_website_message_ids
 #: model:ir.model.fields,field_description:portal.field_purchase_requisition_website_message_ids
 #: model:ir.model.fields,field_description:portal.field_res_partner_website_message_ids
@@ -568,7 +595,6 @@ msgstr "Messages du site web"
 #: model:ir.model.fields,help:portal.field_product_product_website_message_ids
 #: model:ir.model.fields,help:portal.field_product_template_website_message_ids
 #: model:ir.model.fields,help:portal.field_project_project_website_message_ids
-#: model:ir.model.fields,help:portal.field_project_task_website_message_ids
 #: model:ir.model.fields,help:portal.field_purchase_order_website_message_ids
 #: model:ir.model.fields,help:portal.field_purchase_requisition_website_message_ids
 #: model:ir.model.fields,help:portal.field_res_partner_website_message_ids

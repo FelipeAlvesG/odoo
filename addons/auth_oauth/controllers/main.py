@@ -109,19 +109,10 @@ class OAuthLogin(Home):
 
         return response
 
-    @http.route()
-    def web_auth_signup(self, *args, **kw):
-        providers = self.list_providers()
-        response = super(OAuthLogin, self).web_auth_signup(*args, **kw)
-        response.qcontext.update(providers=providers)
-        return response
-
-    @http.route()
-    def web_auth_reset_password(self, *args, **kw):
-        providers = self.list_providers()
-        response = super(OAuthLogin, self).web_auth_reset_password(*args, **kw)
-        response.qcontext.update(providers=providers)
-        return response
+    def get_auth_signup_qcontext(self):
+        result = super(OAuthLogin, self).get_auth_signup_qcontext()
+        result["providers"] = self.list_providers()
+        return result
 
 
 class OAuthController(http.Controller):
@@ -131,6 +122,8 @@ class OAuthController(http.Controller):
     def signin(self, **kw):
         state = json.loads(kw['state'])
         dbname = state['d']
+        if not http.db_filter([dbname]):
+            return BadRequest()
         provider = state['p']
         context = state.get('c', {})
         registry = registry_get(dbname)
@@ -179,6 +172,8 @@ class OAuthController(http.Controller):
         if not dbname:
             dbname = db_monodb()
         if not dbname:
+            return BadRequest()
+        if not http.db_filter([dbname]):
             return BadRequest()
 
         registry = registry_get(dbname)

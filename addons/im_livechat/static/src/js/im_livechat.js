@@ -3,6 +3,7 @@ odoo.define('im_livechat.im_livechat', function (require) {
 
 var local_storage = require('web.local_storage');
 var bus = require('bus.bus').bus;
+var concurrency = require('web.concurrency');
 var config = require('web.config');
 var core = require('web.core');
 var session = require('web.session');
@@ -231,7 +232,12 @@ var LivechatButton = Widget.extend({
             is_note: data.is_note,
             customer_email_data: []
         };
-
+        var hasAlreadyMessage = _.some(this.messages, function (message) {
+            return message.id === msg.id;
+        });
+        if (hasAlreadyMessage) {
+            return;
+        }
         // Compute displayed author name or email
         msg.displayed_author = msg.author_id && msg.author_id[1] ||
                                this.options.default_username;
@@ -304,6 +310,7 @@ var Feedback = Widget.extend({
         this.channel_uuid = channel_uuid;
         this.server_origin = session.origin;
         this.rating = undefined;
+        this.dp = new concurrency.DropPrevious();
     },
 
     on_click_smiley: function (ev) {
@@ -313,7 +320,7 @@ var Feedback = Widget.extend({
 
         // only display textearea if bad smiley selected
         var close_chat = false;
-        if (this.rating === 0) {
+        if (this.rating === 1) {
             this.$('.o_livechat_rating_reason').show();
         } else {
             this.$('.o_livechat_rating_reason').hide();
@@ -339,7 +346,7 @@ var Feedback = Widget.extend({
             rate: this.rating,
             reason : options.reason
         };
-        return session.rpc('/im_livechat/feedback', args).then(function () {
+        this.dp.add(session.rpc('/im_livechat/feedback', args)).then(function () {
             if (options.close) {
                 var content = _.str.sprintf(_t("Rating: :rating_%d"), self.rating);
                 if (options.reason) {

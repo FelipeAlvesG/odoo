@@ -180,15 +180,16 @@ def _eval_xml(self, node, env):
     elif node.tag == "function":
         args = []
         a_eval = node.get('eval')
+        model_str = node.get('model')
         # FIXME: should probably be exclusive
         if a_eval:
-            self.idref['ref'] = self.id_get
-            args = safe_eval(a_eval, self.idref)
+            idref2 = _get_idref(self, env, model_str, self.idref)
+            args = safe_eval(a_eval, idref2)
         for n in node:
             return_val = _eval_xml(self, n, env)
             if return_val is not None:
                 args.append(return_val)
-        model = env[node.get('model')]
+        model = env[model_str]
         method = node.get('name')
         # this one still depends on the old API
         return odoo.api.call_kw(model, method, args, {})
@@ -834,7 +835,8 @@ def convert_csv_import(cr, module, fname, csvcontent, idref=None, mode='init',
 def convert_xml_import(cr, module, xmlfile, idref=None, mode='init', noupdate=False, report=None):
     doc = etree.parse(xmlfile)
     relaxng = etree.RelaxNG(
-        etree.parse(os.path.join(config['root_path'],'import_xml.rng' )))
+#        etree.parse(os.path.join(config['root_path'],'import_xml.rng' )))
+         etree.parse(os.path.join(config['root_path'],'import_xml.rng' ),etree.ETCompatXMLParser()))
     try:
         relaxng.assert_(doc)
     except Exception:

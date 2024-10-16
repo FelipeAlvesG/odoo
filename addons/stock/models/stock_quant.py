@@ -77,7 +77,10 @@ class StockQuant(models.Model):
     def check_quantity(self):
         for quant in self:
             if float_compare(quant.quantity, 1, precision_rounding=quant.product_uom_id.rounding) > 0 and quant.lot_id and quant.product_id.tracking == 'serial':
-                raise ValidationError(_('A serial number should only be linked to a single product.'))
+                message_base = _('A serial number should only be linked to a single product.')
+                message_quant = _('Please check the following serial number (name, id): ')
+                message_sn = '(%s, %s)' % (quant.lot_id.name, quant.lot_id.id)
+                raise ValidationError("\n".join([message_base, message_quant, message_sn]))
 
     @api.constrains('location_id')
     def check_location_id(self):
@@ -262,12 +265,12 @@ class StockQuant(models.Model):
             # if we want to reserve
             available_quantity = self._get_available_quantity(product_id, location_id, lot_id=lot_id, package_id=package_id, owner_id=owner_id, strict=strict)
             if float_compare(quantity, available_quantity, precision_rounding=rounding) > 0:
-                raise UserError(_('It is not possible to reserve more products of %s than you have in stock.') % (', '.join(quants.mapped('product_id').mapped('display_name'))))
+                raise UserError(_('It is not possible to reserve more products of %s than you have in stock.') % product_id.display_name)
         elif float_compare(quantity, 0, precision_rounding=rounding) < 0:
             # if we want to unreserve
             available_quantity = sum(quants.mapped('reserved_quantity'))
             if float_compare(abs(quantity), available_quantity, precision_rounding=rounding) > 0:
-                raise UserError(_('It is not possible to unreserve more products of %s than you have in stock.') % (', '.join(quants.mapped('product_id').mapped('display_name'))))
+                raise UserError(_('It is not possible to unreserve more products of %s than you have in stock.') % product_id.display_name)
         else:
             return reserved_quants
 
@@ -291,6 +294,22 @@ class StockQuant(models.Model):
             if float_is_zero(quantity, precision_rounding=rounding) or float_is_zero(available_quantity, precision_rounding=rounding):
                 break
         return reserved_quants
+
+    @api.model
+    def _unlink_zero_quants(self):
+        """ _update_available_quantity may leave quants with no
+        quantity and no reserved_quantity. It used to directly unlink
+        these zero quants but this proved to hurt the performance as
+        this method is often called in batch and each unlink invalidate
+        the cache. We defer the calls to unlink in this method.
+        """
+        precision_digits = max(6, self.env.ref('product.decimal_product_uom').digits * 2)
+        # Use a select instead of ORM search for UoM robustness.
+        query = """SELECT id FROM stock_quant WHERE round(quantity::numeric, %s) = 0 AND round(reserved_quantity::numeric, %s) = 0;"""
+        params = (precision_digits, precision_digits)
+        self.env.cr.execute(query, params)
+        quant_ids = self.env['stock.quant'].browse([quant['id'] for quant in self.env.cr.dictfetchall()])
+        quant_ids.sudo().unlink()
 
     @api.model
     def _merge_quants(self):
@@ -459,7 +478,13 @@ class QuantPackage(models.Model):
             if move_lines_to_remove:
                 move_lines_to_remove.write({'result_package_id': False})
             else:
-                package.mapped('quant_ids').write({'package_id': False})
+                move_line_to_modify = self.env['stock.move.line'].search([
+                    ('package_id', '=', package.id),
+                    ('state', 'in', ('assigned', 'partially_available')),
+                    ('product_qty', '!=', 0),
+                ])
+                move_line_to_modify.write({'package_id': False})
+                package.mapped('quant_ids').sudo().write({'package_id': False})
 
     def action_view_picking(self):
         action = self.env.ref('stock.action_picking_tree_all').read()[0]
@@ -474,7 +499,7 @@ class QuantPackage(models.Model):
         return action
 
     def _get_contained_quants(self):
-        return self.env['stock.quant'].search([('package_id', 'child_of', self.ids)])
+        return self.env['stock.quant'].search([('package_id', 'in', self.ids)])
 
     def _get_all_products_quantities(self):
         '''This function computes the different product quantities for the given package
@@ -484,5 +509,5 @@ class QuantPackage(models.Model):
         for quant in self._get_contained_quants():
             if quant.product_id not in res:
                 res[quant.product_id] = 0
-            res[quant.product_id] += quant.qty
+            res[quant.product_id] += quant.quantity
         return res

@@ -97,7 +97,10 @@ if(!the_form.length) {
                         }
 
                         // checkboxes and radios
-                        the_form.find("input[name^=" + key + "][type!='text']").each(function(){
+                        the_form.find("input[name^='" + key + "_'][type='checkbox']").each(function(){
+                            $(this).val(value);
+                        });
+                        the_form.find("input[name=" + key + "][type!='text']").each(function(){
                             $(this).val(value);
                         });
                     });
@@ -148,7 +151,7 @@ if(!the_form.length) {
         success: function(response, status, xhr, wfe){ // submission attempt
             if(_.has(response, 'errors')){  // some questions have errors
                 _.each(_.keys(response.errors), function(key){
-                    $("#" + key + '>.js_errzone').append('<p>' + response.errors[key] + '</p>').show();
+                    $("#" + key + '>.js_errzone').append($('<p>', {'text': response.errors[key]})).show();
                 });
                 return false;
             }

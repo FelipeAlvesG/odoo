@@ -146,11 +146,13 @@ class ProductProduct(models.Model):
                             'account_id': debit_account_id,
                             'debit': abs(diff * qty_available),
                             'credit': 0,
+                            'product_id': product.id,
                         }), (0, 0, {
                             'name': _('Standard Price changed  - %s') % (product.display_name),
                             'account_id': credit_account_id,
                             'debit': 0,
                             'credit': abs(diff * qty_available),
+                            'product_id': product.id,
                         })],
                     }
                     move = AccountMove.create(move_vals)
@@ -179,64 +181,83 @@ class ProductProduct(models.Model):
         StockMove = self.env['stock.move']
         to_date = self.env.context.get('to_date')
 
-        self.env['account.move.line'].check_access_rights('read')
-        fifo_automated_values = {}
-        query = """SELECT aml.product_id, aml.account_id, sum(aml.debit) - sum(aml.credit), sum(quantity), array_agg(aml.id)
-                     FROM account_move_line AS aml
-                    WHERE aml.product_id IS NOT NULL AND aml.company_id=%%s %s
-                 GROUP BY aml.product_id, aml.account_id"""
-        params = (self.env.user.company_id.id,)
-        if to_date:
-            query = query % ('AND aml.date <= %s',)
-            params = params + (to_date,)
-        else:
-            query = query % ('',)
-        self.env.cr.execute(query, params=params)
+        real_time_product_ids = [product.id for product in self if product.product_tmpl_id.valuation == 'real_time']
+        if real_time_product_ids:
+            self.env['account.move.line'].check_access_rights('read')
+            fifo_automated_values = {}
+            query = """SELECT aml.product_id, aml.account_id, sum(aml.debit) - sum(aml.credit), sum(quantity), array_agg(aml.id)
+                         FROM account_move_line AS aml
+                        WHERE aml.product_id IN %%s AND aml.company_id=%%s %s
+                     GROUP BY aml.product_id, aml.account_id"""
+            params = (tuple(real_time_product_ids), self.env.user.company_id.id)
+            if to_date:
+                query = query % ('AND aml.date <= %s',)
+                params = params + (to_date,)
+            else:
+                query = query % ('',)
+            self.env.cr.execute(query, params=params)
 
-        res = self.env.cr.fetchall()
-        for row in res:
-            fifo_automated_values[(row[0], row[1])] = (row[2], row[3], list(row[4]))
+            res = self.env.cr.fetchall()
+            for row in res:
+                fifo_automated_values[(row[0], row[1])] = (row[2], row[3], list(row[4]))
+
+        product_values = {product.id: 0 for product in self}
+        product_move_ids = {product.id: [] for product in self}
+
+        if to_date:
+            domain = [('product_id', 'in', self.ids), ('date', '<=', to_date)] + StockMove._get_all_base_domain()
+            value_field_name = 'value'
+        else:
+            domain = [('product_id', 'in', self.ids)] + StockMove._get_all_base_domain()
+            value_field_name = 'remaining_value'
+        
+        StockMove.check_access_rights('read')
+        query = StockMove._where_calc(domain)
+        StockMove._apply_ir_rules(query, 'read')
+        from_clause, where_clause, params = query.get_sql()
+        query_str = """
+            SELECT stock_move.product_id, SUM(COALESCE(stock_move.{}, 0.0)), ARRAY_AGG(stock_move.id)
+            FROM {}
+            WHERE {}
+            GROUP BY stock_move.product_id
+        """.format(value_field_name, from_clause, where_clause)
+        self.env.cr.execute(query_str, params)
+        for product_id, value, move_ids in self.env.cr.fetchall():
+            product_values[product_id] = value
+            product_move_ids[product_id] = move_ids
 
         for product in self:
-            if to_date:
-                price_used = product.get_history_price(
-                    self.env.user.company_id.id,
-                    date=to_date,
-                ) if product.cost_method in ['standard', 'average'] else 0.0
-                if product.product_tmpl_id.valuation == 'manual_periodic':
-                    domain = [('product_id', '=', product.id), ('date', '<=', to_date)] + StockMove._get_all_base_domain()
-                    moves = StockMove.search(domain)
-                    product.qty_at_date = product.with_context(company_owned=True, owner_id=False).qty_available
-                    if product.cost_method == 'fifo':
-                        product.stock_value = sum(moves.mapped('value'))
-                        product.stock_fifo_manual_move_ids = StockMove.browse(moves.ids)
-                    elif product.cost_method in ['standard', 'average']:
-                        product.stock_value = product.qty_at_date * price_used
-                elif product.product_tmpl_id.valuation == 'real_time':
-                    valuation_account_id = product.categ_id.property_stock_valuation_account_id.id
-                    value, quantity, aml_ids = fifo_automated_values.get((product.id, valuation_account_id)) or (0, 0, [])
-                    product.qty_at_date = quantity
-                    if product.cost_method == 'fifo':
+            if product.cost_method in ['standard', 'average']:
+                qty_available = product.with_context(company_owned=True, owner_id=False).qty_available
+                price_used = product.standard_price
+                if to_date:
+                    price_used = product.get_history_price(
+                        self.env.user.company_id.id,
+                        date=to_date,
+                    )
+                product.stock_value = price_used * qty_available
+                product.qty_at_date = qty_available
+            elif product.cost_method == 'fifo':
+                if to_date:
+                    if product.product_tmpl_id.valuation == 'manual_periodic':
+                        product.stock_value = product_values[product.id]
+                        product.qty_at_date = product.with_context(company_owned=True, owner_id=False).qty_available
+                        product.stock_fifo_manual_move_ids = StockMove.browse(product_move_ids[product.id])
+                    elif product.product_tmpl_id.valuation == 'real_time':
+                        valuation_account_id = product.categ_id.property_stock_valuation_account_id.id
+                        value, quantity, aml_ids = fifo_automated_values.get((product.id, valuation_account_id)) or (0, 0, [])
                         product.stock_value = value
+                        product.qty_at_date = quantity
                         product.stock_fifo_real_time_aml_ids = self.env['account.move.line'].browse(aml_ids)
-                    elif product.cost_method in ['standard', 'average']:
-                        product.stock_value = quantity * price_used
-            else:
-                if product.product_tmpl_id.valuation == 'manual_periodic':
+                else:
+                    product.stock_value = product_values[product.id]
                     product.qty_at_date = product.with_context(company_owned=True, owner_id=False).qty_available
-                    if product.cost_method == 'fifo':
-                        product.stock_value, product.stock_fifo_manual_move_ids = product._sum_remaining_values()
-                    elif product.cost_method in ['standard', 'average']:
-                        product.stock_value = product.qty_at_date * product.standard_price
-                elif product.product_tmpl_id.valuation == 'real_time':
-                    valuation_account_id = product.categ_id.property_stock_valuation_account_id.id
-                    value, quantity, aml_ids = fifo_automated_values.get((product.id, valuation_account_id)) or (0, 0, [])
-                    product.qty_at_date = quantity
-                    if product.cost_method == 'fifo':
-                        product.stock_value = value
+                    if product.product_tmpl_id.valuation == 'manual_periodic':
+                        product.stock_fifo_manual_move_ids = StockMove.browse(product_move_ids[product.id])
+                    elif product.product_tmpl_id.valuation == 'real_time':
+                        valuation_account_id = product.categ_id.property_stock_valuation_account_id.id
+                        value, quantity, aml_ids = fifo_automated_values.get((product.id, valuation_account_id)) or (0, 0, [])
                         product.stock_fifo_real_time_aml_ids = self.env['account.move.line'].browse(aml_ids)
-                    elif product.cost_method in ['standard', 'average']:
-                        product.stock_value = quantity * product.standard_price
 
     def action_valuation_at_date_details(self):
         """ Returns an action with either a list view of all the valued stock moves of `self` if the
@@ -307,8 +328,6 @@ class ProductProduct(models.Model):
                         'account_id': dacc,
                         'product_id': product.id,
                         'uom_id': uom.id,
-                        'account_analytic_id': account_analytic and account_analytic.id,
-                        'analytic_tag_ids': analytic_tags and analytic_tags.ids and [(6, 0, analytic_tags.ids)] or False,
                     },
 
                     {
@@ -351,7 +370,8 @@ class ProductProduct(models.Model):
             qty_delivered += qty_to_consider
             # `move.price_unit` is negative if the move is out and positive if the move is
             # dropshipped. Use its absolute value to compute the average price unit.
-            average_price_unit = (average_price_unit * (qty_delivered - qty_to_consider) + abs(move.price_unit) * qty_to_consider) / qty_delivered
+            if qty_delivered:
+                average_price_unit = (average_price_unit * (qty_delivered - qty_to_consider) + abs(move.price_unit) * qty_to_consider) / qty_delivered
             if qty_delivered == quantity:
                 break
         return average_price_unit

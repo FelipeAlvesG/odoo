@@ -24,9 +24,7 @@ import logging
 import sys
 import werkzeug
 
-from . import pycompat
-from .misc import ustr
-from . import pycompat
+from . import ustr, pycompat, wrap_values
 
 import odoo
 
@@ -101,12 +99,14 @@ _SAFE_OPCODES = _EXPR_OPCODES.union(set(opmap[x] for x in [
     'CALL_FUNCTION_EX',
     # Already in P2 but apparently the first one is used more aggressively in P3
     'CALL_FUNCTION_KW', 'CALL_FUNCTION_VAR', 'CALL_FUNCTION_VAR_KW',
+    # Added in P3.7 https://bugs.python.org/issue26110
+    'CALL_METHOD', 'LOAD_METHOD',
     'GET_ITER', 'FOR_ITER', 'YIELD_VALUE',
     'JUMP_FORWARD', 'JUMP_IF_TRUE', 'JUMP_IF_FALSE', 'JUMP_ABSOLUTE',
     # New in Python 2.7 - http://bugs.python.org/issue4715 :
     'JUMP_IF_FALSE_OR_POP', 'JUMP_IF_TRUE_OR_POP', 'POP_JUMP_IF_FALSE',
-    'POP_JUMP_IF_TRUE', 'SETUP_EXCEPT', 'END_FINALLY', 'RAISE_VARARGS',
-    'LOAD_NAME', 'STORE_NAME', 'DELETE_NAME', 'LOAD_ATTR',
+    'POP_JUMP_IF_TRUE', 'SETUP_EXCEPT', 'SETUP_FINALLY', 'END_FINALLY',
+    'RAISE_VARARGS', 'LOAD_NAME', 'STORE_NAME', 'DELETE_NAME', 'LOAD_ATTR',
     'LOAD_FAST', 'STORE_FAST', 'DELETE_FAST', 'UNPACK_SEQUENCE',
     'LOAD_GLOBAL', # Only allows access to restricted globals
 ] if x in opmap))
@@ -334,6 +334,9 @@ def safe_eval(expr, globals_dict=None, locals_dict=None, mode="eval", nocopy=Fal
             globals_dict = dict(globals_dict)
         if locals_dict is not None:
             locals_dict = dict(locals_dict)
+
+    wrap_values(globals_dict)
+    wrap_values(locals_dict)
 
     if globals_dict is None:
         globals_dict = {}

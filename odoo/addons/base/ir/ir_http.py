@@ -278,16 +278,18 @@ class IrHttp(models.AbstractModel):
         obj = None
         if xmlid:
             obj = env.ref(xmlid, False)
-        elif id and model == 'ir.attachment' and access_token:
-            obj = env[model].sudo().browse(int(id))
-            if not consteq(obj.access_token, access_token):
-                return (403, [], None)
         elif id and model in env.registry:
             obj = env[model].browse(int(id))
 
         # obj exists
         if not obj or not obj.exists() or field not in obj:
             return (404, [], None)
+
+        # access token grant access
+        if model == 'ir.attachment' and access_token:
+            obj = obj.sudo()
+            if not consteq(obj.access_token or u'', access_token):
+                return (403, [], None)
 
         # check read access
         try:
@@ -323,12 +325,14 @@ class IrHttp(models.AbstractModel):
             content = obj[field] or ''
 
         # filename
+        default_filename = False
         if not filename:
             if filename_field in obj:
                 filename = obj[filename_field]
-            elif module_resource_path:
+            if not filename and module_resource_path:
                 filename = os.path.basename(module_resource_path)
-            else:
+            if not filename:
+                default_filename = True
                 filename = "%s-%s-%s" % (obj._name, obj.id, field)
 
         # mimetype
@@ -341,7 +345,18 @@ class IrHttp(models.AbstractModel):
                 attach_mimetype = env['ir.attachment'].search_read(domain=[('res_model', '=', model), ('res_id', '=', id), ('res_field', '=', field)], fields=['mimetype'], limit=1)
                 mimetype = attach_mimetype and attach_mimetype[0]['mimetype']
             if not mimetype:
-                mimetype = guess_mimetype(base64.b64decode(content), default=default_mimetype)
+                try:
+                    decoded_content = base64.b64decode(content)
+                except base64.binascii.Error:  # if we could not decode it, no need to pass it down: it would crash elsewhere...
+                    return (404, [], None)
+                mimetype = guess_mimetype(decoded_content, default=default_mimetype)
+
+        # extension
+        _, existing_extension = os.path.splitext(filename)
+        if not existing_extension or default_filename:
+            extension = mimetypes.guess_extension(mimetype)
+            if extension:
+                filename = "%s%s" % (filename, extension)
 
         headers += [('Content-Type', mimetype), ('X-Content-Type-Options', 'nosniff')]
 

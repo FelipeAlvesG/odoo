@@ -136,6 +136,10 @@ var ImageDialog = Widget.extend({
         this.media = media;
         this.images = [];
         this.page = 0;
+        this.lastLoadedPage = -1;
+        this.records = [];
+        this.needle = '';
+        this.perPage = this.IMAGES_PER_ROW * this.IMAGES_ROWS;
     },
     start: function () {
         this.$preview = this.$('.preview-container').detach();
@@ -159,11 +163,15 @@ var ImageDialog = Widget.extend({
                 return;
             }
             self.page += $target.hasClass('previous') ? -1 : 1;
+            if (self.page > self.lastLoadedPage) {
+                return self.fetchPage(self.page);
+            }
             self.display_attachments();
         });
         this.fetch_existing().then(function () {
             if (o.url) {
-                self.set_image(_.find(self.records, function (record) { return record.url === o.url;}) || o);
+                self.push(_.find(self.records, function (record) { return record.url === o.url;}) || o);
+                self.display_attachments();
             }
         });
         return res;
@@ -190,8 +198,7 @@ var ImageDialog = Widget.extend({
 
         var img = this.images[0];
         if (!img) {
-            var id = this.$(".existing-attachments [data-src]:first").data('id');
-            img = _.find(this.images, function (img) { return img.id === id;});
+            return this.media;
         }
 
         var def = $.when();
@@ -287,7 +294,7 @@ var ImageDialog = Widget.extend({
             $form.find('.well > span').remove();
             $form.find('.well > div').show();
             _.each(attachments, function (record) {
-                record.src = record.url || '/web/image/' + record.id;
+                record.src = record.url || _.str.sprintf('/web/image/%s/%s', record.id, encodeURI(record.name)); // Name is added for SEO purposes
                 record.is_document = !(/gif|jpe|jpg|png/.test(record.mimetype));
             });
             if (error || !attachments.length) {
@@ -325,10 +332,25 @@ var ImageDialog = Widget.extend({
         }
     },
     fetch_existing: function (needle) {
-        var domain = this.domain.concat(['|', ['mimetype', '=', false], ['mimetype', this.options.document ? 'not in' : 'in', ['image/gif', 'image/jpe', 'image/jpeg', 'image/jpg', 'image/gif', 'image/png']]]);
-        if (needle && needle.length) {
-            domain.push('|', ['datas_fname', 'ilike', needle], ['name', 'ilike', needle]);
+        this.records.splice(0);
+        this.page = 0;
+        this.lastLoadedPage = 0;
+        this.needle = needle;
+        return this.fetchPage(0);
+    },
+    fetchPage: function (pageNum) {
+        var domain = this.domain.concat([
+            '|',
+            ['type', '=like', 'binary'],
+            ['url', '!=', false],
+            '|',
+            ['mimetype', '=', false],
+            ['mimetype', this.options.document ? 'not in' : 'in', ['image/gif', 'image/jpe', 'image/jpeg', 'image/jpg', 'image/gif', 'image/png']],
+        ]);
+        if (this.needle && this.needle.length) {
+            domain.push('|', ['datas_fname', 'ilike', this.needle], ['name', 'ilike', this.needle]);
         }
+        var self = this;
         return this._rpc({
             model: 'ir.attachment',
             method: 'search_read',
@@ -338,15 +360,26 @@ var ImageDialog = Widget.extend({
                 fields: ['name', 'mimetype', 'checksum', 'url', 'type', 'res_id', 'res_model', 'access_token'],
                 order: [{name: 'id', asc: false}],
                 context: weContext.get(),
+                // Try to fetch first record of next page just to know whether there is a next page.
+                limit: this.perPage + 1,
+                offset: pageNum * this.perPage,
             }
-        }).then(this.proxy('fetched_existing'));
-    },
-    fetched_existing: function (records) {
-        this.records = _.uniq(_.filter(records, function (r) {
-            return (r.type === "binary" || r.url && r.url.length > 0);
-        }), function (r) {
-            return (r.url || r.id);
+        }).then(function (records) {
+            self.lastLoadedPage = pageNum;
+            self.fetched_existing(records, pageNum);
         });
+    },
+    fetched_existing: function (records, pageNum) {
+        if (typeof pageNum !== 'number') {
+            this.records = _.uniq(_.filter(records, function (r) {
+                return (r.type === "binary" || r.url && r.url.length > 0);
+            }), function (r) {
+                return (r.url || r.id);
+            });
+        } else {
+            this.records = this.records.slice();
+            Array.prototype.splice.apply(this.records, [pageNum * this.perPage, records.length].concat(records));
+        }
         _.each(this.records, function (record) {
             record.src = record.url || _.str.sprintf('/web/image/%s/%s', record.id, encodeURI(record.name)); // Name is added for SEO purposes
             record.is_document = !(/gif|jpe|jpg|png/.test(record.mimetype));
@@ -355,13 +388,12 @@ var ImageDialog = Widget.extend({
     },
     display_attachments: function () {
         var self = this;
-        var per_screen = this.IMAGES_PER_ROW * this.IMAGES_ROWS;
-        var from = this.page * per_screen;
+        var from = this.page * this.perPage;
         var records = this.records;
 
         // Create rows of 3 records
         var rows = _(records).chain()
-            .slice(from, from + per_screen)
+            .slice(from, from + this.perPage)
             .groupBy(function (_, index) { return Math.floor(index / self.IMAGES_PER_ROW); })
             .values()
             .value();
@@ -371,7 +403,7 @@ var ImageDialog = Widget.extend({
         this.$('.existing-attachments').replaceWith(QWeb.render('web_editor.dialog.image.existing.content', {rows: rows}));
         this.parent.$('.pager')
             .find('li.previous a').toggleClass('disabled', (from === 0)).end()
-            .find('li.next a').toggleClass('disabled', (from + per_screen >= records.length));
+            .find('li.next a').toggleClass('disabled', (from + this.perPage >= records.length));
 
         this.$el.find('.o_image').each(function () {
             var $div = $(this);
@@ -725,7 +757,7 @@ var VideoDialog = Widget.extend({
                 '<div class="media_iframe_video" data-oe-expression="' + this.$content.attr('src') + '">'+
                     '<div class="css_editable_mode_display">&nbsp;</div>'+
                     '<div class="media_iframe_video_size" contenteditable="false">&nbsp;</div>'+
-                    '<iframe src="' + this.$content.attr('src') + '" frameborder="0" contenteditable="false"></iframe>'+
+                    '<iframe src="' + this.$content.attr('src') + '" frameborder="0" contenteditable="false" allowfullscreen="allowfullscreen"></iframe>'+
                 '</div>'
             );
             $(this.media).replaceWith($content);
@@ -771,7 +803,7 @@ var VideoDialog = Widget.extend({
         options = options || {};
 
         // Video url patterns(youtube, instagram, vimeo, dailymotion, youku, ...)
-        var ytRegExp = /^(?:(?:https?:)?\/\/)?(?:www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
+        var ytRegExp = /^(?:(?:https?:)?\/\/)?(?:www\.)?(?:youtu\.be\/|youtube(-nocookie)?\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((?:\w|-){11})(?:\S+)?$/;
         var ytMatch = url.match(ytRegExp);
 
         var insRegExp = /(.*)instagram.com\/p\/(.[a-zA-Z0-9]*)/;
@@ -783,7 +815,7 @@ var VideoDialog = Widget.extend({
         var vimRegExp = /\/\/(player.)?vimeo.com\/([a-z]*\/)*([0-9]{6,11})[?]?.*/;
         var vimMatch = url.match(vimRegExp);
 
-        var dmRegExp = /.+dailymotion.com\/(video|hub|embed)\/([^_]+)[^#]*(#video=([^_&]+))?/;
+        var dmRegExp = /.+dailymotion.com\/(video|hub|embed)\/([^_?]+)[^#]*(#video=([^_&]+))?/;
         var dmMatch = url.match(dmRegExp);
 
         var ykuRegExp = /(.*).youku\.com\/(v_show\/id_|embed\/)(.+)/;
@@ -796,10 +828,10 @@ var VideoDialog = Widget.extend({
             return {errorCode: 0};
         }
 
-        var autoplay = options.autoplay ? '?autoplay=1' : '?autoplay=0';
+        var autoplay = options.autoplay ? '?autoplay=1&mute=1' : '?autoplay=0';
 
-        if (ytMatch && ytMatch[1].length === 11) {
-            $video.attr('src', '//www.youtube.com/embed/' + ytMatch[1] + autoplay);
+        if (ytMatch && ytMatch[2].length === 11) {
+            $video.attr('src', '//www.youtube' + (ytMatch[1] || '') + '.com/embed/' + ytMatch[2] + autoplay);
         } else if (insMatch && insMatch[2].length) {
             $video.attr('src', '//www.instagram.com/p/' + insMatch[2] + '/embed/');
             videoType = 'ins';
@@ -807,7 +839,7 @@ var VideoDialog = Widget.extend({
             $video.attr('src', vinMatch[0] + '/embed/simple');
             videoType = 'vin';
         } else if (vimMatch && vimMatch[3].length) {
-            $video.attr('src', '//player.vimeo.com/video/' + vimMatch[3] + autoplay);
+            $video.attr('src', '//player.vimeo.com/video/' + vimMatch[3] + autoplay.replace('mute', 'muted'));
             videoType = 'vim';
         } else if (dmMatch && dmMatch[2].length) {
             var just_id = dmMatch[2].replace('video/','');
@@ -821,8 +853,12 @@ var VideoDialog = Widget.extend({
             return {errorCode: 1};
         }
 
+        if (ytMatch) {
+            $video.attr('src', $video.attr('src') + '&rel=0');
+        }
         if (options.loop && (ytMatch || vimMatch)) {
-            $video.attr('src', $video.attr('src') + '&loop=1');
+            var videoSrc = _.str.sprintf('%s&loop=1', $video.attr('src'));
+            $video.attr('src', ytMatch ? _.str.sprintf('%s&playlist=%s', videoSrc, ytMatch[2]) : videoSrc);
         }
         if (options.hide_controls && (ytMatch || dmMatch)) {
             $video.attr('src', $video.attr('src') + '&controls=0');
@@ -984,10 +1020,14 @@ var MediaDialog = Dialog.extend({
 
         this.$modal.addClass('note-image-dialog');
         this.$modal.find('.modal-dialog').addClass('o_select_media_dialog');
-
+        // DO NOT FORWARD PORT
+        this.mailCompose = this.options.res_model === "mail.compose.message";
         this.only_images = this.options.only_images || this.options.select_images || (this.media && ($(this.media).parent().data("oe-field") === "image" || $(this.media).parent().data("oe-type") === "image"));
+        if (this.only_images || this.mailCompose) {
+            this.$('[href="#editor-media-video"]').addClass('hidden');
+        }
         if (this.only_images) {
-            this.$('[href="#editor-media-document"], [href="#editor-media-video"], [href="#editor-media-icon"]').addClass('hidden');
+            this.$('[href="#editor-media-document"], [href="#editor-media-icon"]').addClass('hidden');
         }
 
         this.opened((function () {
@@ -1014,8 +1054,10 @@ var MediaDialog = Dialog.extend({
         if (!this.only_images) {
             this.iconDialog = new fontIconsDialog(this, this.media, this.options);
             this.iconDialog.appendTo(this.$("#editor-media-icon"));
-            this.videoDialog = new VideoDialog(this, this.media, this.options);
-            this.videoDialog.appendTo(this.$("#editor-media-video"));
+            if (!this.mailCompose) {
+                this.videoDialog = new VideoDialog(this, this.media, this.options);
+                this.videoDialog.appendTo(this.$("#editor-media-video"));
+            }
         }
 
         this.active = this.imageDialog;
@@ -1024,9 +1066,11 @@ var MediaDialog = Dialog.extend({
             if ($(event.target).is('[href="#editor-media-image"]')) {
                 self.active = self.imageDialog;
                 self.$('li.search, li.previous, li.next').removeClass("hidden");
+                self.imageDialog.display_attachments();
             } else if ($(event.target).is('[href="#editor-media-document"]')) {
                 self.active = self.documentDialog;
                 self.$('li.search, li.previous, li.next').removeClass("hidden");
+                self.documentDialog.display_attachments();
             } else if ($(event.target).is('[href="#editor-media-icon"]')) {
                 self.active = self.iconDialog;
                 self.$('li.search, li.previous, li.next').removeClass("hidden");
@@ -1181,6 +1225,7 @@ var LinkDialog = Dialog.extend({
                 }
 
                 this.data.range = range.create(sc, so, ec, eo);
+                $(editable).data("range", this.data.range);
                 this.data.range.select();
             } else {
                 nodes = dom.ancestor(sc, dom.isAnchor).childNodes;
@@ -1196,6 +1241,8 @@ var LinkDialog = Dialog.extend({
                     if (dom.ancestor(nodes[i], dom.isImg)) {
                         this.data.images.push(dom.ancestor(nodes[i], dom.isImg));
                         text += '[IMG]';
+                    } else if (!is_link && nodes[i].nodeType === 1) {
+                        // just use text nodes from listBetween
                     } else if (!is_link && i===0) {
                         text += nodes[i].textContent.slice(so, Infinity);
                     } else if (!is_link && i===nodes.length-1) {

@@ -477,13 +477,13 @@ function on_partner_notification (data) {
         if (channel) {
             var msg;
             if (_.contains(['public', 'private'], channel.type)) {
-                msg = _.str.sprintf(_t('You unsubscribed from <b>%s</b>.'), channel.name);
+                msg = _.str.sprintf(_t('You unsubscribed from <b>%s</b>.'), _.escape(channel.name));
             } else {
-                msg = _.str.sprintf(_t('You unpinned your conversation with <b>%s</b>.'), channel.name);
+                msg = _.str.sprintf(_t('You unpinned your conversation with <b>%s</b>.'), _.escape(channel.name));
             }
             remove_channel(channel);
             chat_manager.bus.trigger("unsubscribe_from_channel", data.id);
-            web_client.do_notify(_("Unsubscribed"), msg);
+            web_client.do_notify(_t("Unsubscribed"), msg);
         }
     } else if (data.type === 'toggle_star') {
         on_toggle_star_notification(data);
@@ -585,7 +585,7 @@ function on_chat_session_notification (chat_session) {
     if ((chat_session.channel_type === "channel") && (chat_session.state === "open")) {
         add_channel(chat_session, {autoswitch: false});
         if (!chat_session.is_minimized && chat_session.info !== 'creation') {
-            web_client.do_notify(_t("Invitation"), _t("You have been invited to: ") + chat_session.name);
+            web_client.do_notify(_t("Invitation"), _.str.sprintf(_t("You have been invited to: %s"), _.escape(chat_session.name)));
         }
     }
     // partner specific change (open a detached window for example)
@@ -759,7 +759,7 @@ var ChatManager =  Class.extend(Mixins.EventDispatcherMixin, ServicesMixin, {
                         processed_msgs.push(add_message(msg, {silent: true}));
                     });
                     return _.sortBy(loaded_msgs.concat(processed_msgs), function (msg) {
-                        return msg.date;
+                        return msg.id;
                     });
                 });
         } else {
@@ -863,7 +863,9 @@ var ChatManager =  Class.extend(Mixins.EventDispatcherMixin, ServicesMixin, {
         if ('ids' in options) {
             // get messages from their ids (chatter is the main use case)
             return this._fetchDocumentMessages(options.ids, options).then(function(result) {
-                chat_manager.mark_as_read(options.ids);
+                if (options.shouldMarkAsRead) { // DO NOT FORWARD-PORT
+                    chat_manager.mark_as_read(options.ids); // DO NOT FORWARD-PORT
+                } // DO NOT FORWARD-PORT
                 return result;
             });
         }

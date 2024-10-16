@@ -3,22 +3,25 @@
 # * event
 # 
 # Translators:
-# Martin Trigaux, 2017
-# Lord Cobol, 2017
-# Kristoffer Grundström <kristoffer.grundstrom1983@gmail.com>, 2017
-# Anders Wallenquist <anders.wallenquist@vertel.se>, 2017
-# Haojun Zou <apollo_zhj@msn.com>, 2017
-# Frida E, 2017
 # Jan-Eric Lindh <jelindh@gmail.com>, 2017
+# Haojun Zou <apollo_zhj@msn.com>, 2017
 # Daniel Forslund <daniel.forslund@gmail.com>, 2017
 # Patrik Lermon <patrik.lermon@gmail.com>, 2017
+# Kristoffer Grundström <lovaren@gmail.com>, 2017
+# Frida E, 2017
+# Martin Trigaux, 2018
+# 03992e16f8df6e39b9d1cc0ff635887e, 2018
+# Chrille Hedberg <hedberg.chrille@gmail.com>, 2018
+# Anders Wallenquist <anders.wallenquist@vertel.se>, 2019
+# Anto Nilsson <anton.nilsson@vertel.se>, 2020
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 11.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2018-02-19 13:43+0000\n"
-"PO-Revision-Date: 2018-02-19 13:43+0000\n"
-"Last-Translator: Patrik Lermon <patrik.lermon@gmail.com>, 2017\n"
+"POT-Creation-Date: 2018-07-27 11:56+0000\n"
+"PO-Revision-Date: 2017-09-20 10:17+0000\n"
+"Last-Translator: Anto Nilsson <anton.nilsson@vertel.se>, 2020\n"
 "Language-Team: Swedish (https://www.transifex.com/odoo/teams/41243/sv/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -639,17 +642,17 @@ msgstr "Deltagare"
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_event_auto_confirm
 msgid "Autoconfirm Registrations"
-msgstr ""
+msgstr "Autobekräftade registreringar"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_type_auto_confirm
 msgid "Automatically Confirm Registrations"
-msgstr ""
+msgstr "Automatiskt Bekräfta Registreringar"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_type_use_mail_schedule
 msgid "Automatically Send Emails"
-msgstr ""
+msgstr "Automatiskt Skicka Emails"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_event_seats_available
@@ -779,7 +782,7 @@ msgid "Company"
 msgstr "Bolag"
 
 #. module: event
-#: code:addons/event/models/event.py:481
+#: code:addons/event/models/event.py:486
 #, python-format
 msgid "Compose Email"
 msgstr "Skriv e-post"
@@ -828,7 +831,7 @@ msgstr "Bekräftad"
 #. module: event
 #: model:ir.ui.view,arch_db:event.view_event_kanban
 msgid "Confirmed attendees"
-msgstr ""
+msgstr "Bekräftade besökare"
 
 #. module: event
 #: model:ir.ui.view,arch_db:event.view_event_search
@@ -883,13 +886,13 @@ msgid "Created on"
 msgstr "Skapad den"
 
 #. module: event
-#: code:addons/event/models/event.py:444
+#: code:addons/event/models/event.py:449
 #, python-format
 msgid "Customer"
 msgstr "Kund"
 
 #. module: event
-#: code:addons/event/models/event.py:446
+#: code:addons/event/models/event.py:451
 #, python-format
 msgid "Customer Email"
 msgstr "Kund-e-postmeddelande"
@@ -1084,6 +1087,24 @@ msgstr "Evenemangsorganisation"
 #: model:ir.ui.view,arch_db:event.view_registration_search
 msgid "Event Registration"
 msgstr "Evenemangsregistrering"
+
+#. module: event
+#: code:addons/event/models/event_mail.py:143
+#, python-format
+msgid ""
+"Event Scheduler for:\n"
+"                              - Event: %s (%s)\n"
+"                              - Scheduled: %s\n"
+"                              - Template: %s (%s)\n"
+"\n"
+"                            Failed with error:\n"
+"                              - %s\n"
+"\n"
+"                            You receive this email because you are:\n"
+"                              - the organizer of the event,\n"
+"                              - or the responsible of the event,\n"
+"                              - or the last writer of the template."
+msgstr ""
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_registration_event_begin_date
@@ -1385,7 +1406,7 @@ msgstr "Begränsad"
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_type_has_seats_limitation
 msgid "Limited Seats"
-msgstr ""
+msgstr "Begränsat Antal Platser"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_event_address_id
@@ -1464,7 +1485,7 @@ msgstr "Max antal deltagare"
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_type_default_registration_max
 msgid "Maximum Registrations"
-msgstr ""
+msgstr "Maximum Registrerade"
 
 #. module: event
 #: code:addons/event/models/event.py:253
@@ -1481,7 +1502,7 @@ msgstr "Minimum antal deltagare"
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_type_default_registration_min
 msgid "Minimum Registrations"
-msgstr ""
+msgstr "Minimum Registrerade"
 
 #. module: event
 #: model:event.event,description:event.event_0
@@ -1550,6 +1571,8 @@ msgid ""
 "    track registrations and participations, automate the confirmation emails,\n"
 "    sell tickets, etc."
 msgstr ""
+"Odoo hjälper er att planera dina arrangemang effektivt:\n"
+"Parallella spår, anmälningar och deltagande, automatiseras med epost, försäljning av biljetter etc"
 
 #. module: event
 #: model:event.type,name:event.event_type_data_online
@@ -1561,12 +1584,12 @@ msgstr "Uppkopplad"
 #: model:ir.model.fields,field_description:event.field_event_event_is_online
 #: model:ir.model.fields,field_description:event.field_event_type_is_online
 msgid "Online Event"
-msgstr ""
+msgstr "Uppkopplat Evenemang"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_res_config_settings_module_website_event_sale
 msgid "Online Ticketing"
-msgstr ""
+msgstr "Uppkopplad Biljettförsäljning"
 
 #. module: event
 #: model:ir.ui.view,arch_db:event.view_event_type_form
@@ -1574,6 +1597,8 @@ msgid ""
 "Online events like webinars do not require a specific location\n"
 "                                            and are hosted online."
 msgstr ""
+"Uppkopplade evenemang som webbseminarium kräver inte en specifik plats utan "
+"de sker uppkopplat."
 
 #. module: event
 #: model:ir.model.fields,help:event.field_event_type_is_online
@@ -1581,6 +1606,8 @@ msgid ""
 "Online events like webinars do not require a specific location and are "
 "hosted online."
 msgstr ""
+"Uppkopplade evenemang som webbseminarium kräver inte en specifik plats utan "
+"de sker uppkopplat."
 
 #. module: event
 #: model:event.event,name:event.event_0
@@ -1782,7 +1809,7 @@ msgstr ""
 #. module: event
 #: model:ir.ui.view,arch_db:event.res_config_settings_view_form
 msgid "Sell tickets on your website"
-msgstr ""
+msgstr "Sälj biljetter på din Webbplats"
 
 #. module: event
 #: model:ir.ui.view,arch_db:event.res_config_settings_view_form
@@ -1938,7 +1965,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:event.field_event_event_twitter_hashtag
 #: model:ir.model.fields,field_description:event.field_event_type_default_hashtag
 msgid "Twitter Hashtag"
-msgstr ""
+msgstr "Twitterhashtag"
 
 #. module: event
 #: selection:event.event,state:0 selection:event.registration,state:0
@@ -2000,12 +2027,12 @@ msgstr "Kommande evenemang från idag"
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_type_use_hashtag
 msgid "Use Default Hashtag"
-msgstr ""
+msgstr "Använd Standardhashtagg"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_type_use_timezone
 msgid "Use Default Timezone"
-msgstr ""
+msgstr "Använd Standardtidszon"
 
 #. module: event
 #: model:res.groups,name:event.group_event_user
@@ -2023,6 +2050,12 @@ msgstr ""
 #: model:ir.ui.view,arch_db:event.view_event_type_form
 msgid "Visibility"
 msgstr "Synlighet"
+
+#. module: event
+#: code:addons/event/models/event_mail.py:130
+#, python-format
+msgid "WARNING: Event Scheduler Error for event: %s"
+msgstr ""
 
 #. module: event
 #: model:event.event,description:event.event_2
@@ -2110,25 +2143,25 @@ msgid "events@odoo.com"
 msgstr ""
 
 #. module: event
-#: code:addons/event/models/event.py:503
+#: code:addons/event/models/event.py:508
 #, python-format
 msgid "in %d days"
 msgstr ""
 
 #. module: event
-#: code:addons/event/models/event.py:507
+#: code:addons/event/models/event.py:512
 #, python-format
 msgid "next month"
 msgstr ""
 
 #. module: event
-#: code:addons/event/models/event.py:505
+#: code:addons/event/models/event.py:510
 #, python-format
 msgid "next week"
 msgstr ""
 
 #. module: event
-#: code:addons/event/models/event.py:509
+#: code:addons/event/models/event.py:514
 #, python-format
 msgid "on "
 msgstr ""
@@ -2136,16 +2169,16 @@ msgstr ""
 #. module: event
 #: model:ir.model,name:event.model_res_config_settings
 msgid "res.config.settings"
-msgstr ""
+msgstr "res.config.settings"
 
 #. module: event
-#: code:addons/event/models/event.py:499
+#: code:addons/event/models/event.py:504
 #, python-format
 msgid "today"
 msgstr ""
 
 #. module: event
-#: code:addons/event/models/event.py:501
+#: code:addons/event/models/event.py:506
 #, python-format
 msgid "tomorrow"
 msgstr ""

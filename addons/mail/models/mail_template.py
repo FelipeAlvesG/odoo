@@ -63,7 +63,7 @@ def format_amount(env, amount, currency):
     lang = env['res.lang']._lang_get(env.context.get('lang') or 'en_US')
 
     formatted_amount = lang.format(fmt, currency.round(amount), grouping=True, monetary=True)\
-        .replace(r' ', u'\N{NO-BREAK SPACE}').replace(r'-', u'\u2011')
+        .replace(r' ', u'\N{NO-BREAK SPACE}').replace(r'-', u'-\N{ZERO WIDTH NO-BREAK SPACE}')
 
     pre = post = u''
     if currency.position == 'before':
@@ -98,7 +98,7 @@ try:
         'str': str,
         'quote': urls.url_quote,
         'urlencode': urls.url_encode,
-        'datetime': datetime,
+        'datetime': tools.wrap_module(datetime, []),
         'len': len,
         'abs': abs,
         'min': min,
@@ -252,17 +252,17 @@ class MailTemplate(models.Model):
     def unlink_action(self):
         for template in self:
             if template.ref_ir_act_window:
-                template.ref_ir_act_window.sudo().unlink()
+                template.ref_ir_act_window.unlink()
         return True
 
     @api.multi
     def create_action(self):
-        ActWindowSudo = self.env['ir.actions.act_window'].sudo()
+        ActWindow = self.env['ir.actions.act_window']
         view = self.env.ref('mail.email_compose_message_wizard_form')
 
         for template in self:
             button_name = _('Send Mail (%s)') % template.name
-            action = ActWindowSudo.create({
+            action = ActWindow.create({
                 'name': button_name,
                 'type': 'ir.actions.act_window',
                 'res_model': 'mail.compose.message',
@@ -292,8 +292,8 @@ class MailTemplate(models.Model):
         # form a tree
         root = lxml.html.fromstring(html)
         if not len(root) and root.text is None and root.tail is None:
-            html = u'<div>%s</div>' % html
-            root = lxml.html.fromstring(html, encoding='unicode')
+            html = u'<div>%s</div>' % tools.ustr(html)
+            root = lxml.html.fromstring(html)
 
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         base = urls.url_parse(base_url)
@@ -369,9 +369,10 @@ class MailTemplate(models.Model):
             variables['object'] = record
             try:
                 render_result = template.render(variables)
-            except Exception:
+            except Exception as e:
                 _logger.info("Failed to render template %r using values %r" % (template, variables), exc_info=True)
-                raise UserError(_("Failed to render template %r using values %r")% (template, variables))
+                raise UserError(_("Failed to render template %r using values %r") % (template, variables) +
+                                "\n\n%s: %s" % (type(e).__name__, str(e)))
             if render_result == u"False":
                 render_result = u""
             results[res_id] = render_result

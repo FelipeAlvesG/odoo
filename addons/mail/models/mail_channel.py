@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import base64
-from email.utils import formataddr
-
 import re
-import uuid
+from uuid import uuid4
 
 from odoo import _, api, fields, models, modules, tools
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, AccessError
 from odoo.osv import expression
-from odoo.tools import ormcache
+from odoo.tools import ormcache, formataddr
 from odoo.tools.safe_eval import safe_eval
 
 
@@ -26,6 +24,27 @@ class ChannelPartner(models.Model):
     fold_state = fields.Selection([('open', 'Open'), ('folded', 'Folded'), ('closed', 'Closed')], string='Conversation Fold State', default='open')
     is_minimized = fields.Boolean("Conversation is minimized")
     is_pinned = fields.Boolean("Is pinned on the interface", default=True)
+
+    @api.model
+    def create(self, vals):
+        if 'channel_id' in vals and not self.env.user._is_admin():
+            channel_id = self.env['mail.channel'].browse(vals['channel_id'])
+            if not channel_id._can_invite(vals.get('partner_id')):
+                raise AccessError(_('The partner can not join this channel'))
+        return super(ChannelPartner, self).create(vals)
+
+    def write(self, vals):
+        if not self.env.user._is_admin():
+            if {'channel_id', 'partner_id', 'partner_email'} & set(vals):
+                raise AccessError(_('You can not write on this field'))
+            elif self.mapped('partner_id') != self.env.user.partner_id:
+                raise AccessError(_('You can not write on the record of other users'))
+        return super(ChannelPartner, self).write(vals)
+
+    def unlink(self):
+        if not self.env.user._is_admin() and not all(record.channel_id.is_member for record in self):
+            raise AccessError(_('You can not remove this partner from this channel'))
+        return super(ChannelPartner, self).unlink()
 
 
 class Channel(models.Model):
@@ -56,7 +75,7 @@ class Channel(models.Model):
         ('channel', 'Channel')],
         'Channel Type', default='channel')
     description = fields.Text('Description')
-    uuid = fields.Char('UUID', size=50, index=True, default=lambda self: '%s' % uuid.uuid4(), copy=False)
+    uuid = fields.Char('UUID', size=50, index=True, default=lambda self: str(uuid4()), copy=False)
     email_send = fields.Boolean('Send messages by email', default=False)
     # multi users channel
     channel_last_seen_partner_ids = fields.One2many('mail.channel.partner', 'channel_id', string='Last Seen')
@@ -116,6 +135,10 @@ class Channel(models.Model):
     @api.model
     def create(self, vals):
         tools.image_resize_images(vals)
+
+        # always add the current user to the channel
+        vals['channel_partner_ids'] = vals.get('channel_partner_ids', []) + [(4, self.env.user.partner_id.id)]
+
         # Create channel and alias
         channel = super(Channel, self.with_context(
             alias_model_name=self._name, alias_parent_model_name=self._name, mail_create_nolog=True, mail_create_nosubscribe=True)
@@ -242,7 +265,7 @@ class Channel(models.Model):
     @api.returns('self', lambda value: value.id)
     def message_post(self, body='', subject=None, message_type='notification', subtype=None, parent_id=False, attachments=None, content_subtype='html', **kwargs):
         # auto pin 'direct_message' channel partner
-        self.filtered(lambda channel: channel.channel_type == 'chat').mapped('channel_last_seen_partner_ids').write({'is_pinned': True})
+        self.filtered(lambda channel: channel.channel_type == 'chat').mapped('channel_last_seen_partner_ids').sudo().write({'is_pinned': True})
         message = super(Channel, self.with_context(mail_create_nosubscribe=True)).message_post(body=body, subject=subject, message_type=message_type, subtype=subtype, parent_id=parent_id, attachments=attachments, content_subtype=content_subtype, **kwargs)
         return message
 
@@ -413,8 +436,8 @@ class Channel(models.Model):
                     AND P.partner_id IN %s
                     AND channel_type LIKE 'chat'
                 GROUP BY P.channel_id
-                HAVING COUNT(P.partner_id) = %s
-            """, (tuple(partners_to), len(partners_to),))
+                HAVING array_agg(P.partner_id ORDER BY P.partner_id) = %s
+            """, (tuple(partners_to), sorted(list(partners_to)),))
             result = self.env.cr.dictfetchall()
             if result:
                 # get the existing channel between the given partners
@@ -471,7 +494,7 @@ class Channel(models.Model):
             'is_minimized': minimized
         }
         domain = [('partner_id', '=', self.env.user.partner_id.id), ('channel_id.uuid', '=', uuid)]
-        channel_partners = self.env['mail.channel.partner'].search(domain)
+        channel_partners = self.env['mail.channel.partner'].search(domain, limit=1)
         channel_partners.write(values)
         self.env['bus.bus'].sendone((self._cr.dbname, 'res.partner', self.env.user.partner_id.id), channel_partners.channel_id.channel_info()[0])
 
@@ -518,6 +541,22 @@ class Channel(models.Model):
 
         # broadcast the channel header to the added partner
         self._broadcast(partner_ids)
+
+    def _can_invite(self, partner_id):
+        """Return True if the current user can invite the partner to the channel."""
+        self.ensure_one()
+        sudo_self = self.sudo()
+        if sudo_self.public == 'public':
+            return True
+        if sudo_self.public == 'private':
+            return self.is_member
+
+        # get the user related to the invited partner
+        partner = self.env['res.partner'].browse(partner_id).exists()
+        invited_user_id = partner.user_ids[:1]
+        if invited_user_id:
+            return (self.env.user | invited_user_id) <= sudo_self.group_public_id.users
+        return False
 
     #------------------------------------------------------
     # Instant Messaging View Specific (Slack Client Action)
@@ -587,7 +626,6 @@ class Channel(models.Model):
             'name': name,
             'public': privacy,
             'email_send': False,
-            'channel_partner_ids': [(4, self.env.user.partner_id.id)]
         })
         notification = _('<div class="o_mail_notification">created <a href="#" class="o_channel_redirect" data-oe-id="%s">#%s</a></div>') % (new_channel.id, new_channel.name,)
         new_channel.message_post(body=notification, message_type="notification", subtype="mail.mt_comment")

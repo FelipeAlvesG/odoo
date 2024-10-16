@@ -16,7 +16,7 @@ class LivechatController(http.Controller):
         # _get_asset return the bundle html code (script and link list) but we want to use the attachment content
         xmlid = 'im_livechat.external_lib'
         files, remains = request.env["ir.qweb"]._get_asset_content(xmlid, options=request.context)
-        asset = AssetsBundle(xmlid, files, remains)
+        asset = AssetsBundle(xmlid, files)
 
         mock_attachment = getattr(asset, ext)()
         if isinstance(mock_attachment, list):  # suppose that CSS asset will not required to be split in pages
@@ -80,7 +80,6 @@ class LivechatController(http.Controller):
     @http.route('/im_livechat/feedback', type='json', auth='public')
     def feedback(self, uuid, rate, reason=None, **kwargs):
         Channel = request.env['mail.channel']
-        Rating = request.env['rating.rating']
         channel = Channel.sudo().search([('uuid', '=', uuid)], limit=1)
         if channel:
             # limit the creation : only ONE rating per session
@@ -101,7 +100,11 @@ class LivechatController(http.Controller):
                 # if logged in user, set its partner on rating
                 values['partner_id'] = request.env.user.partner_id.id if request.session.uid else False
                 # create the rating
-                rating = Rating.sudo().create(values)
+
+                channel.write({
+                    'rating_ids': [(0, False, values)]
+                })
+                rating = channel.rating_ids[0]
             else:
                 rating = channel.rating_ids[0]
                 rating.write(values)
